@@ -31,9 +31,12 @@ class Card(object):
             return "King"
         if self.value == 14:
             return "Ace"
-        if self.value == 15:
+
+        ## Two values are left for trump rank here
+
+        if self.value == 17:
             return "Small Joker"
-        if self.value == 16:
+        if self.value == 18:
             return "Big Joker"
 
     def __gt__(self, card2):
@@ -61,6 +64,16 @@ class Card(object):
             return 10
         return 0
 
+    def comparison_value(self, trump_rank, trump_suit):
+
+        value = self.value
+        if value == trump_rank:
+            if self.suit == trump_suit:
+                value = 16
+            else:
+                value = 15
+        return value 
+
 
 class Deck(object):
     def __init__(self):
@@ -71,7 +84,7 @@ class Deck(object):
                 self.cards.append(Card(suit, value))
 
         # Small Joker
-        self.cards.append(Card(None, 15))
+        self.cards.append(Card(None, 17))
 
         # Big Joker
-        self.cards.append(Card(None, 16))
+        self.cards.append(Card(None, 18))

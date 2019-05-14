@@ -59,7 +59,7 @@ class Player(object):
         pretty_hand += hand_jokers
         return pretty_hand
 
-class Round(object):
+class TractorRound(object):
     def __init__(self, ordered_players, num_decks, active_player_name):
         self.active_player_name = active_player_name
 
@@ -215,8 +215,12 @@ class Round(object):
         # Handle Kitty
         self.handle_kitty()
 
+        # Let's play tractor
+        
+        
+
 if __name__ == "__main__":
     players = [Player("Matt"), Player("Roger"), Player("Carlo"), Player("Aviv")] 
-    tractor_round = Round(players, num_decks=2, active_player_name="Matt")
+    tractor_round = TractorRound(players, num_decks=2, active_player_name="Matt")
 
     tractor_round.play(first_game=True)
