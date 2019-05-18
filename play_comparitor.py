@@ -1,9 +1,33 @@
+from enum import unique, Enum
+
 from deck import (Suit, Card, TRUMP_SUIT)
+
+@unique
+class PlayType(Enum):
+    """
+    Enum for play types
+    """
+    SINGLE = "single"
+    PAIR = "pair"
+    TRACTOR = "tractor"
+    TOP_CARD = "top-card"
+
+    # A play that follows a lead may not be a cogent play
+    FOLLOW = "follow"
+
+    def __str__(self):
+        return self.value
 
 class Play(object):
     def __init__(self, player, cards):
         self.player = player
         self.cards = cards
+
+    def __str__(self):
+        return str(self.player) + " played " + str(self.cards)
+
+    def __repr__(self):
+        return str(self)
 
 
 class PlayComparitor(object):
@@ -46,6 +70,18 @@ class PlayComparitor(object):
         if len(cards) == 1 or self._is_top_card(cards) or self._is_pair(cards) or self._is_tractor(cards):
             return True
         return False
+
+    def get_play_type(self, cards):
+        if len(cards) == 1:
+            return PlayType.SINGLE
+        elif self._is_tractor(cards):
+            return PlayType.TRACTOR
+        elif self._is_pair(cards):
+            return PlayType.PAIR
+        elif self._is_top_card(cards):
+            return PlayType.TOP_CARD
+
+        return PlayType.FOLLOW
 
     # TODO - implement top card
     def _is_top_card(self, cards):

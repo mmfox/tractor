@@ -1,9 +1,8 @@
-from enum import unique, Enum
-
 from deck import Suit
-from play_comparitor import (Play, PlayComparitor)
+from play_comparitor import (Play, PlayType, PlayComparitor)
 from player import Player
 from tractor_deck import TractorDeck
+from trump_claim import (TrumpClaim, TrumpClaimType)
 
 KITTY_MIN = 5
 CARDS_PER_DECK = 54
@@ -14,27 +13,6 @@ JOKER_CLAIM = 3
 
 BIG_JOKER_VALUE = 16
 SMALL_JOKER_VALUE = 15
-
-@unique
-class TrumpClaimType(Enum):
-    """
-    Enum for trump claim types
-    """
-    SINGLE_RANK_CLAIM = 1
-    PAIR_RANK_CLAIM = 2
-    JOKER_CLAIM = 3
-
-    def __str__(self):
-        return str(self.value)
-
-class TrumpClaim(object):
-    def __init__(self, claim_type, suit):
-        self.type = claim_type
-        self.suit = suit
-
-    def __repr__(self):
-        return str(self.suit)
-
 
 class TractorRound(object):
     def __init__(self, num_players, num_decks, active_player, lead_player):
@@ -222,7 +200,7 @@ class TractorRound(object):
                 # Verify is valid play
                 # TODO - add verification that the player didn't have to play something else
                 played_cards = self._sort_cards(played_cards)
-                if not self.play_comparitor.is_valid_lead(played_cards) or (led_play != None and len(led_play) != len(played_cards)):
+                if not self.play_comparitor.is_valid_lead(played_cards) or (led_play != None and len(led_play.cards) != len(played_cards)):
                     print("The provided play is not valid.  Please play a single card, a pair, top card, or a tractor.  Follow the led play if you are not leading.")
                     continue
                 valid_play = True
@@ -234,12 +212,25 @@ class TractorRound(object):
         else:
             # TODO - have other plays follow with a legal play
             if led_play:
-                led_trump_or_suit = led_play[0].trump_or_suit(self.trump_rank, self.trump_suit)
+                led_type = self.play_comparitor.get_play_type(led_play.cards)
+                led_trump_or_suit = led_play.cards[0].trump_or_suit(self.trump_rank, self.trump_suit)
                 allowed_cards = [card for card in player.hand if card.trump_or_suit(self.trump_rank, self.trump_suit) == led_trump_or_suit]
-                if len(allowed_cards) < len(led_play):
-                    allowed_cards += player.hand[0:len(led_play)-len(allowed_cards)]
+                if len(allowed_cards) < len(led_play.cards):
+                    allowed_cards += player.hand[0:len(led_play.cards)-len(allowed_cards)]
 
-                played_cards = allowed_cards[0:len(led_play)]
+                played_cards = allowed_cards[0:len(led_play.cards)]
+
+                 # TODO - finish implementation of legal follows
+                if led_type == PlayType.SINGLE:
+                    played_cards = allowed_cards[0]
+                elif led_type == PlayType.TRACTOR:
+                    pass
+                elif led_type == PlayType.PAIR:
+                    pass
+                # TODO - implement top card
+                elif led_type == PlayType.TOP_CARD:
+                    pass
+ 
                 played_cards = self._sort_cards(played_cards)
 
                 indices_to_remove = []
@@ -265,7 +256,7 @@ class TractorRound(object):
         plays.append(self.make_play(self.lead_player))
         curr_player = self.lead_player.next_player
         while curr_player != self.lead_player:
-            plays.append(self.make_play(curr_player, plays[0].cards))
+            plays.append(self.make_play(curr_player, plays[0]))
             curr_player = curr_player.next_player
 
         winning_play = self.play_comparitor.compare_plays(plays)
