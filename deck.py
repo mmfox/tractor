@@ -1,5 +1,7 @@
 from enum import unique, Enum
 
+TRUMP_SUIT = "trump_suit"
+
 @unique
 class Suit(Enum):
     """
@@ -59,20 +61,25 @@ class Card(object):
     @property
     def points(self):
         if self.value == 5:
-            return 10
+            return 5
         if self.value == 10 or self.value == 13:
             return 10
         return 0
 
     def comparison_value(self, trump_rank, trump_suit):
-
         value = self.value
         if value == trump_rank:
             if self.suit == trump_suit:
                 value = 16
             else:
                 value = 15
-        return value 
+        return value
+ 
+    def trump_or_suit(self, trump_rank, trump_suit):
+        if self.value == trump_rank or self.suit == trump_suit or self.suit == None:
+            return TRUMP_SUIT
+    
+        return self.suit
 
 
 class Deck(object):

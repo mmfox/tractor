@@ -1,10 +1,12 @@
-from deck import Suit
-from tractor_deck import TractorDeck
 from enum import unique, Enum
+
+from deck import Suit
+from play_comparitor import (Play, PlayComparitor)
+from player import Player
+from tractor_deck import TractorDeck
 
 KITTY_MIN = 5
 CARDS_PER_DECK = 54
-STARTING_RANK = 2
 
 SINGLE_RANK_CLAIM = 1
 PAIR_RANK_CLAIM = 2
@@ -33,43 +35,20 @@ class TrumpClaim(object):
     def __repr__(self):
         return str(self.suit)
 
-class Player(object):
-    def __init__(self, name, rank=None):
-        self.name = name
-        self.rank = rank or STARTING_RANK
-        self.hand = []
-
-    def __repr__(self):
-        return str(self.name)
-
-    def rank_up(self, rank_increase):
-        self.rank += rank_increase
-
-    def draw_card(self, card):
-        self.hand.append(card)
-       
-    def pretty_hand_repr(self, game_rank):
-        pretty_hand = []
-        for suit in Suit:
-             hand_suit = filter(lambda c: c.suit == suit and c.value != game_rank, self.hand)
-             hand_suit.sort()
-             pretty_hand += hand_suit
-        hand_jokers = filter(lambda c: c.suit == None or c.value == game_rank, self.hand)
-        hand_jokers.sort()
-        pretty_hand += hand_jokers
-        return pretty_hand
 
 class TractorRound(object):
-    def __init__(self, ordered_players, num_decks, active_player_name):
-        self.active_player_name = active_player_name
+    def __init__(self, num_players, num_decks, active_player, lead_player):
+        self.active_player = active_player
 
-        self.num_players = len(ordered_players)
+        self.lead_player = lead_player
+        self.num_players = num_players
         self.num_decks = num_decks
-        self.trump_rank = ordered_players[0].rank
+        self.trump_rank = lead_player.rank
         self.trump_suit = None
 
-        self.ordered_players = ordered_players
         self.deck = TractorDeck(num_decks=self.num_decks, kitty_size=self._get_kitty_size())
+
+        self.play_comparitor = None
 
     def _get_kitty_size(self):
         kitty_size = (self.num_decks * CARDS_PER_DECK) % self.num_players
@@ -129,65 +108,68 @@ class TractorRound(object):
 
     # Handle drawing all cards, setting trump suit
     def draw(self, first_game):
-        first_player_index = 0
+        first_player = self.lead_player
+        curr_player = self.lead_player
 
         trump_claim = None
 
         while(len(self.deck.undrawn_cards) > 0):
-            for index, player in enumerate(self.ordered_players):
-                if player.name == self.active_player_name:
-                    raw_input("Press enter to draw.")
+            if curr_player == self.active_player:
+                raw_input("Press enter to draw.")
 
-                drawn_card = self.deck.draw()
-                player.draw_card(drawn_card)
+            drawn_card = self.deck.draw()
+            curr_player.draw_card(drawn_card)
 
-                if player.name == self.active_player_name:
-                    print("Drew card: " + str(drawn_card))
-                    print("Current hand: " + str(player.pretty_hand_repr(self.trump_rank)))
+            if curr_player == self.active_player:
+                print("Drew card: " + str(drawn_card))
+                print("Current hand: " + str(curr_player.pretty_hand_repr(self.trump_rank)))
 
-                # Give an opportunity to claim
-                available_claims = self._player_available_claims(player, trump_claim)
-                if len(available_claims) > 0:
-                    claim = available_claims[0]
+            # Give an opportunity to claim
+            available_claims = self._player_available_claims(curr_player, trump_claim)
+            if len(available_claims) > 0:
+                claim = available_claims[0]
 
-                    # Let active player not default to first claim
-                    if player.name == self.active_player_name:
-                        claim_suit = raw_input("Which suit would you like to claim? Avaliable are: " + str(available_claims) + " or press enter to not claim.\n")
+                # Let active player not default to first claim
+                if curr_player == self.active_player:
+                    claim_suit = raw_input("Which suit would you like to claim? Avaliable are: " + str(available_claims) + " or press enter to not claim.\n")
 
-                        claim = next((claim for claim in available_claims if str(claim.suit) == claim_suit), None)
-                        if not claim:
-                            print("Passed on claim")
-                            continue
-                   
-                    if first_game:
-                        first_player_index = index
+                    claim = next((claim for claim in available_claims if str(claim.suit) == claim_suit), None)
+                    if not claim:
+                        print("Passed on claim")
+                        continue
+               
+                if first_game:
+                    first_player = curr_player
  
-                    print("Trump suit claimed by: " + str(player))
-                    print("Claim type: " + str(claim.type))
-                    print(claim)
-                    trump_claim = claim
-                    self.trump_suit = claim.suit
+                print("Trump suit claimed by: " + str(curr_player))
+                print("Claim type: " + str(claim.type))
+                print(claim)
+                trump_claim = claim
+                self.trump_suit = claim.suit
 
-        # Reorder players if needed
-        self.ordered_players = self.ordered_players[first_player_index:] + self.ordered_players[0:first_player_index]
+            # Next player's turn to draw
+            curr_player = curr_player.next_player
 
-        print("Newly ordered players: " + str(self.ordered_players))
+        self.lead_player = first_player
+        print("First to act: " + str(self.lead_player))
+        print("Final trump suit is: " + str(self.trump_suit))
+
+        self.play_comparitor = PlayComparitor(self.trump_suit, self.trump_rank)
 
     def handle_kitty(self):
-        kitty_player = self.ordered_players[0]
-        kitty_player.hand += self.deck.kitty
+        self.lead_player.hand += self.deck.kitty
 
         kitty_cards = []
-        if kitty_player.name == self.active_player_name:
+        if self.lead_player == self.active_player:
             print("\n\nYou get the kitty! Please pick " + str(self.deck.kitty_size) + " cards to go back in the kitty.")
-            print("Hand with kitty: " + str(kitty_player.pretty_hand_repr(self.trump_rank)))
+            print("Hand with kitty: " + str(self.lead_player.pretty_hand_repr(self.trump_rank)))
             kitty_cards = []
             while len(kitty_cards) != self.deck.kitty_size:
                 card_string = raw_input("Pick a card to go back into the kitty.\n")
                 kitty_card = None
-                for index, card in enumerate(kitty_player.hand):
+                for index, card in enumerate(self.lead_player.hand):
                     if card_string == str(card):
-                        kitty_player.hand.pop(index)
+                        self.lead_player.hand.pop(index)
                         kitty_card = card
                         break 
 
@@ -196,14 +178,107 @@ class TractorRound(object):
                 else: 
                     print("Please match the card name exactly as printed above!")
 
-            print("Hand after kitty removed: " + str(kitty_player.pretty_hand_repr(self.trump_rank)))
+            print("Hand after kitty removed: " + str(self.lead_player.pretty_hand_repr(self.trump_rank)))
 
         else:
-            kitty_cards = kitty_player.hand[0:self.deck.kitty_size]
-            kitty_player.hand = kitty_player.hand[self.deck.kitty_size:]
+            kitty_cards = self.lead_player.hand[0:self.deck.kitty_size]
+            self.lead_player.hand = self.lead_player.hand[self.deck.kitty_size:]
 
         # Actually set kitty
         self.deck.kitty = kitty_cards
+
+    def _sort_cards(self, cards):
+        # Sort cards in descending order
+        def func(card):
+            return card.comparison_value(self.trump_rank, self.trump_suit)
+        return sorted(cards, key = func, reverse=True)
+
+    def make_play(self, player, led_play=None):
+        if player == self.active_player:
+            valid_play = False
+            while not valid_play:
+                if led_play:
+                    print("\n\nThe lead for this trick was " + str(led_play) + ".  Please follow this lead.")
+ 
+                played_cards_str = raw_input("\n\nPick what to play from your hand (e.g. 2 of clubs, 2 of clubs): \n" + str(player.pretty_hand_repr(self.trump_rank)) + "\n")
+                print("\n")
+
+                parsed_played_cards_str = played_cards_str.split(", ") 
+                played_cards = []
+                indices_to_remove = []
+
+                for played_card_str in parsed_played_cards_str:
+                    for index, card in enumerate(player.hand):
+                        if played_card_str == str(card) and index not in indices_to_remove:
+                            played_cards.append(card)
+                            indices_to_remove.append(index)
+                            break 
+
+                # Verify we parsed everything correctly
+                if len(parsed_played_cards_str) != len(played_cards):
+                    print("The play was incorrectly formatted.  Please copy the exact strings printed above to play.")
+                    continue
+
+                # Verify is valid play
+                # TODO - add verification that the player didn't have to play something else
+                played_cards = self._sort_cards(played_cards)
+                if not self.play_comparitor.is_valid_lead(played_cards) or (led_play != None and len(led_play) != len(played_cards)):
+                    print("The provided play is not valid.  Please play a single card, a pair, top card, or a tractor.  Follow the led play if you are not leading.")
+                    continue
+                valid_play = True
+
+                # Remove cards from hand
+                indices_to_remove.sort(reverse=True)
+                for index in indices_to_remove:
+                    player.hand.pop(index)
+        else:
+            # TODO - have other plays follow with a legal play
+            if led_play:
+                led_trump_or_suit = led_play[0].trump_or_suit(self.trump_rank, self.trump_suit)
+                allowed_cards = [card for card in player.hand if card.trump_or_suit(self.trump_rank, self.trump_suit) == led_trump_or_suit]
+                if len(allowed_cards) < len(led_play):
+                    allowed_cards += player.hand[0:len(led_play)-len(allowed_cards)]
+
+                played_cards = allowed_cards[0:len(led_play)]
+                played_cards = self._sort_cards(played_cards)
+
+                indices_to_remove = []
+                for played_card in played_cards:
+                    for index, card in enumerate(player.hand):
+                        if played_card == card:
+                            indices_to_remove.append(index)
+                            break
+                   
+                indices_to_remove.sort(reverse=True)
+                for index in indices_to_remove:
+                    player.hand.pop(index)
+            else:
+                played_cards = [player.hand[0]]
+                player.hand.pop(0)
+
+
+        print(str(player) + " is playing " + str(played_cards))
+        return Play(player, played_cards)
+
+    def play_trick(self):
+        plays = []
+        plays.append(self.make_play(self.lead_player))
+        curr_player = self.lead_player.next_player
+        while curr_player != self.lead_player:
+            plays.append(self.make_play(curr_player, plays[0].cards))
+            curr_player = curr_player.next_player
+
+        winning_play = self.play_comparitor.compare_plays(plays)
+        print(str(winning_play.player) + " won the round!\n")
+
+        # Calculate points
+        points = 0
+        for play in plays:
+           for card in play.cards:
+              points += card.points
+
+        self.lead_player = winning_play.player
+        self.lead_player.points += points
             
 
     def play(self, first_game=False):
@@ -216,11 +291,31 @@ class TractorRound(object):
         self.handle_kitty()
 
         # Let's play tractor
-        
-        
+        while len(self.lead_player.hand) > 0:
+            self.play_trick()
+       
+        # Figure out kitty points
+        # TODO - double points if not on same team as declarer
+        kitty_points = 0
+        for card in self.deck.kitty:
+            kitty_points += card.points
+
+        self.lead_player.points += kitty_points
+
+        # Print results of the round
+        print(str(self.lead_player) + " won the kitty, earning an extra " + str(kitty_points) + " for a total of " + str(self.lead_player.points) + " points.\n")
+        curr_player = self.lead_player.next_player
+        while curr_player != self.lead_player:
+            print(str(curr_player) + " earned " + str(curr_player.points) + " points.\n")
+            curr_player = curr_player.next_player
+ 
 
 if __name__ == "__main__":
-    players = [Player("Matt"), Player("Roger"), Player("Carlo"), Player("Aviv")] 
-    tractor_round = TractorRound(players, num_decks=2, active_player_name="Matt")
+    matt = Player("Matt") 
+    roger = Player("Roger", matt)
+    carlo = Player("Carlo", roger)
+    aviv = Player("Aviv", carlo)
+    matt.next_player = aviv 
+    tractor_round = TractorRound(num_players=4, num_decks=2, active_player=matt, lead_player=matt)
 
     tractor_round.play(first_game=True)
