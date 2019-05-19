@@ -222,7 +222,7 @@ class TractorRound(object):
 
                  # TODO - finish implementation of legal follows
                 if led_type == PlayType.SINGLE:
-                    played_cards = allowed_cards[0]
+                    played_cards = [allowed_cards[0]]
                 elif led_type == PlayType.TRACTOR:
                     pass
                 elif led_type == PlayType.PAIR:
