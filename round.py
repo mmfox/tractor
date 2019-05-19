@@ -114,6 +114,7 @@ class TractorRound(object):
                     claim = next((claim for claim in available_claims if str(claim.suit) == claim_suit), None)
                     if not claim:
                         print("Passed on claim")
+                        curr_player = curr_player.next_player
                         continue
                
                 if first_game:
@@ -210,13 +211,13 @@ class TractorRound(object):
                 for index in indices_to_remove:
                     player.hand.pop(index)
         else:
-            # TODO - have other plays follow with a legal play
             if led_play:
                 led_type = self.play_comparitor.get_play_type(led_play.cards)
                 led_trump_or_suit = led_play.cards[0].trump_or_suit(self.trump_rank, self.trump_suit)
                 allowed_cards = [card for card in player.hand if card.trump_or_suit(self.trump_rank, self.trump_suit) == led_trump_or_suit]
                 if len(allowed_cards) < len(led_play.cards):
-                    allowed_cards += player.hand[0:len(led_play.cards)-len(allowed_cards)]
+                    player_hand_unallowed_cards = [card for card in player.hand if card not in allowed_cards]
+                    allowed_cards += player_hand_unallowed_cards[0:len(led_play.cards)-len(allowed_cards)]
 
                 played_cards = allowed_cards[0:len(led_play.cards)]
 
@@ -227,6 +228,16 @@ class TractorRound(object):
 
                     if len(following_tractors) > 0:
                         played_cards = following_tractors[0]
+                    else:
+                        played_cards = []
+                        following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
+                        while len(played_cards) < len(led_play.cards) and len(following_pairs) > len(played_cards) / 2:
+                            played_cards += following_pairs[len(played_cards) / 2]
+
+                        if len(played_cards) < len(led_play.cards):
+                           allowed_unplayed_cards = [card for card in allowed_cards if card not in played_cards]
+                           played_cards += allowed_unplayed_cards[0:len(led_play.cards)-len(played_cards)]                            
+
                 elif led_type == PlayType.PAIR:
                     following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
                     if len(following_pairs) > 0:
@@ -240,7 +251,7 @@ class TractorRound(object):
                 indices_to_remove = []
                 for played_card in played_cards:
                     for index, card in enumerate(player.hand):
-                        if played_card == card:
+                        if played_card == card and index not in indices_to_remove:
                             indices_to_remove.append(index)
                             break
                    
