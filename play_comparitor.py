@@ -83,6 +83,42 @@ class PlayComparitor(object):
 
         return PlayType.FOLLOW
 
+    # Currently need to have a suit since pairs will not be sectioned by suit just yet
+    # TODO - support splitting pairs into suits
+    def find_tractors(self, cards, trump_or_suit, tractor_length=None):
+        tractors = []
+        pairs = self.find_pairs(cards, trump_or_suit)
+
+        def func(pair):
+            return pair[0].comparison_value(self.trump_rank, self.trump_suit)
+
+        pairs.sort(key = func)
+
+        for index, pair in enumerate(pairs):
+            pair_value = pair[0].comparison_value(self.trump_rank, self.trump_suit)
+            next_index = index+1
+            while next_index < len(pairs) and pairs[next_index][0].comparison_value(self.trump_rank, self.trump_suit) == (pair_value + next_index - index):
+                next_index += 1
+            if next_index-index > 1 and (not tractor_length or next_index - index == tractor_length):
+                tractor = []
+                for i in range(index, next_index):
+                    tractor += pairs[i]
+                tractors.append(tractor)
+
+        return tractors
+
+    def find_pairs(self, cards, trump_or_suit=None):
+        pair_dict = {}
+        pairs = []
+      
+        for card in cards:
+            if str(card) in pair_dict:
+                pairs.append([pair_dict[str(card)], card])
+            if not trump_or_suit or card.trump_or_suit(self.trump_rank, self.trump_suit) == trump_or_suit: 
+                pair_dict[str(card)] = card
+
+        return pairs
+        
     # TODO - implement top card
     def _is_top_card(self, cards):
         return False
@@ -93,7 +129,7 @@ class PlayComparitor(object):
         return False
     
     def _is_tractor(self, cards):
-        if len(cards) % 2 == 0:
+        if len(cards) > 2 and len(cards) % 2 == 0:
             prev_pair_card = None
             for pair_num in range(len(cards) / 2):
                 pair_start_index = 2*pair_num
@@ -107,7 +143,8 @@ class PlayComparitor(object):
 
 
 if __name__ == "__main__":
-   plays = [Play(None, [Card(Suit.DIAMONDS, 4), Card(Suit.DIAMONDS, 4), Card(Suit.DIAMONDS, 3), Card(Suit.DIAMONDS, 3)]), Play(None, [Card(Suit.DIAMONDS, 7), Card(Suit.DIAMONDS, 7), Card(Suit.DIAMONDS, 6), Card(Suit.DIAMONDS, 6)]), Play(None, [Card(Suit.HEARTS, 11), Card(Suit.HEARTS, 11), Card(Suit.HEARTS, 10), Card(Suit.HEARTS, 10)])]
-   comparitor = PlayComparitor(None, 2)
-   better_play = comparitor.compare_plays(plays)
-   print(better_play.cards)
+   cards = [Card(Suit.DIAMONDS, 4), Card(Suit.DIAMONDS, 4), Card(Suit.DIAMONDS, 3), Card(Suit.DIAMONDS, 3), Card(Suit.DIAMONDS, 2), Card(Suit.DIAMONDS, 2), Card(Suit.SPADES, 2), Card(Suit.SPADES, 2)]
+   comparitor = PlayComparitor(Suit.DIAMONDS, 2)
+   tractors = comparitor.find_tractors(cards, "trump_suit") 
+
+   print(tractors)

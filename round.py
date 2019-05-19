@@ -11,8 +11,8 @@ SINGLE_RANK_CLAIM = 1
 PAIR_RANK_CLAIM = 2
 JOKER_CLAIM = 3
 
-BIG_JOKER_VALUE = 16
-SMALL_JOKER_VALUE = 15
+BIG_JOKER_VALUE = 18
+SMALL_JOKER_VALUE = 17
 
 class TractorRound(object):
     def __init__(self, num_players, num_decks, active_player, lead_player):
@@ -220,13 +220,17 @@ class TractorRound(object):
 
                 played_cards = allowed_cards[0:len(led_play.cards)]
 
-                 # TODO - finish implementation of legal follows
                 if led_type == PlayType.SINGLE:
                     played_cards = [allowed_cards[0]]
                 elif led_type == PlayType.TRACTOR:
-                    pass
+                    following_tractors = self.play_comparitor.find_tractors(allowed_cards, led_trump_or_suit, len(led_play.cards))
+
+                    if len(following_tractors) > 0:
+                        played_cards = following_tractors[0]
                 elif led_type == PlayType.PAIR:
-                    pass
+                    following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
+                    if len(following_pairs) > 0:
+                        played_cards = following_pairs[0]
                 # TODO - implement top card
                 elif led_type == PlayType.TOP_CARD:
                     pass
