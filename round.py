@@ -1,4 +1,8 @@
+import math
+import random
+
 from deck import Suit
+from find_friend import FriendRequirement
 from play_comparitor import (Play, PlayType, PlayComparitor)
 from player import Player
 from tractor_deck import TractorDeck
@@ -27,13 +31,23 @@ class TractorRound(object):
         self.deck = TractorDeck(num_decks=self.num_decks, kitty_size=self._get_kitty_size())
 
         self.play_comparitor = None
+        self.friend_reqs = []
+        self.attacker_set = set()
 
     def _get_kitty_size(self):
         kitty_size = (self.num_decks * CARDS_PER_DECK) % self.num_players
         while kitty_size < KITTY_MIN:
            kitty_size += self.num_players
 
-        return kitty_size 
+        return kitty_size
+
+    def _get_attacking_team_size(self):
+        # Special case, ignore standard formula
+        if self.num_players == 4:
+            return 2
+
+        return math.floor((self.num_players / 2) - 0.1)
+ 
 
     # Figure out if a player can claim right now
     def _player_available_claims(self, player, existing_claim):
@@ -264,7 +278,39 @@ class TractorRound(object):
 
 
         print(str(player) + " is playing " + str(played_cards))
+
+        # Check if they join the defending team
+        for friend_req in self.friend_reqs:
+            if friend_req.is_friend(played_cards):
+                self.attacker_set.add(player)
+                print(str(player) + " has joined the attacking team!  The team is now: " + str(self.attacker_set))
+
         return Play(player, played_cards)
+
+    def set_friend_reqs(self):
+        # The lead player is always in the defender set
+        self.attacker_set.add(self.lead_player)
+
+        attacking_team_size = self._get_attacking_team_size()
+
+        if self.lead_player == self.active_player:
+            print("\nPlease pick which plays will determine your teammates.  You will have " + str(attacking_team_size - 1) + " additional teammates")
+            while len(self.friend_reqs) < attacking_team_size - 1:
+                friend_req_str = raw_input("Please input a number of play and a card for the first find friend requirement (e.g. '2, Ace of clubs' would denote the second played Ace of clubs)\n")
+                
+                parsed_friend_req_str = friend_req_str.split(", ")
+                if len(parsed_friend_req_str) != 2 or parsed_friend_req_str[1] not in [str(card) for card in self.deck.cards]:
+                    print("Could not parse your input.  Please try again.")
+                    continue
+                self.friend_reqs.append(FriendRequirement(int(parsed_friend_req_str[0]), parsed_friend_req_str[1]))
+        else:
+            while len(self.friend_reqs) < attacking_team_size - 1:
+                number_play = random.randint(1, 2)
+                card = self.deck.cards[random.randint(0, len(self.deck.cards)-1)]
+                self.friend_reqs.append(FriendRequirement(number_play, str(card)))
+
+        print("\n\nFind a friend requirements are as follows:")
+        print(self.friend_reqs)
 
     def play_trick(self):
         plays = []
@@ -296,6 +342,9 @@ class TractorRound(object):
         # Handle Kitty
         self.handle_kitty()
 
+        # Set find freinds requirements
+        self.set_friend_reqs()
+
         # Let's play tractor
         while len(self.lead_player.hand) > 0:
             self.play_trick()
@@ -306,14 +355,37 @@ class TractorRound(object):
         for card in self.deck.kitty:
             kitty_points += card.points
 
+        if self.lead_player not in self.attacker_set:
+            kitty_points *= 2
+            print("Attacking team won the kitty!  Double trouble!")
+
         self.lead_player.points += kitty_points
 
         # Print results of the round
         print(str(self.lead_player) + " won the kitty, earning an extra " + str(kitty_points) + " for a total of " + str(self.lead_player.points) + " points.\n")
         curr_player = self.lead_player.next_player
+
+        attacking_points = 0
+        defending_points = 0
+
+        if self.lead_player in self.attacker_set:
+            attacking_points += self.lead_player.points
+        else:
+            defending_points += self.lead_player.points
+
         while curr_player != self.lead_player:
             print(str(curr_player) + " earned " + str(curr_player.points) + " points.\n")
+            if curr_player in self.attacker_set:
+                attacking_points += curr_player.points
+            else:
+                defending_points += curr_player.points
             curr_player = curr_player.next_player
+
+        print("Final attacking team was: " + str(self.attacker_set))
+        print("Attacking team earned " + str(attacking_points) + " points!")
+        print("Defending team earned " + str(defending_points) + " points!")
+
+        
  
 
 if __name__ == "__main__":
