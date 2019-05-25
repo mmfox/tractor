@@ -1,5 +1,3 @@
-DEFENDER_WIN_POINTS = 80
-
 def get_rank_up(defending_points):
     attacking_rank_up = 0
     defending_rank_up = 0

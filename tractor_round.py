@@ -1,23 +1,14 @@
 import math
 import random
 
+from constants import KITTY_MIN, CARDS_PER_DECK
 from deck import Suit
 from find_friend import FriendRequirement
 from play_comparitor import Play, PlayType, PlayComparitor
 from player import Player
 from rank import get_rank_up
 from tractor_deck import TractorDeck
-from trump_claim import TrumpClaim, TrumpClaimType
-
-KITTY_MIN = 5
-CARDS_PER_DECK = 54
-
-SINGLE_RANK_CLAIM = 1
-PAIR_RANK_CLAIM = 2
-JOKER_CLAIM = 3
-
-BIG_JOKER_VALUE = 18
-SMALL_JOKER_VALUE = 17
+from trump_claim import get_available_claims, TrumpClaim, TrumpClaimType
 
 class TractorRound(object):
     def __init__(self, num_players, num_decks, active_player, lead_player):
@@ -49,56 +40,6 @@ class TractorRound(object):
             return 2
 
         return math.floor((self.num_players / 2) - 0.1)
- 
-
-    # Figure out if a player can claim right now
-    def _player_available_claims(self, player, existing_claim):
-       single_claims = []
-       pair_claims = []
-       joker_claims = []
-
-       claim_dict = {}
-       claim_dict["big_joker"] = 0
-       claim_dict["small_joker"] = 0
-       for suit in Suit:
-          claim_dict[str(suit)] = 0
-
-       for card in player.hand:
-           if card.value == self.trump_rank:
-               claim_dict[str(card.suit)] += 1
-           
-           if card.value == SMALL_JOKER_VALUE:
-               claim_dict["small_joker"] += 1
-               if claim_dict["small_joker"] > 1:
-                   joker_claims.append(TrumpClaim(TrumpClaimType.JOKER_CLAIM, suit=None))
-
-           if card.value == BIG_JOKER_VALUE:
-               claim_dict["big_joker"] += 1
-               if claim_dict["big_joker"] > 1:
-                   joker_claims.append(TrumpClaim(TrumpClaimType.JOKER_CLAIM, suit=None))
-
-       for suit in Suit:
-           if claim_dict[str(suit)] > 1:
-               pair_claims.append(TrumpClaim(TrumpClaimType.PAIR_RANK_CLAIM, suit))
-           elif claim_dict[str(suit)] > 0:
-               single_claims.append(TrumpClaim(TrumpClaimType.SINGLE_RANK_CLAIM, suit))
-
-       if not existing_claim:
-           return single_claims + pair_claims + joker_claims
-
-       if existing_claim.type == TrumpClaimType.SINGLE_RANK_CLAIM:
-           return pair_claims + joker_claims
-
-       if existing_claim.type == TrumpClaimType.PAIR_RANK_CLAIM:
-           return joker_claims
-
-       # Last case is a Joker Claim       
-       return []
-
-
-    # Pick a round winner and next lead
-    def find_best_card(self, played_cards):
-        pass    
 
     # Handle drawing all cards, setting trump suit
     def draw(self, first_game):
@@ -119,7 +60,7 @@ class TractorRound(object):
                 print("Current hand: " + str(curr_player.pretty_hand_repr(self.trump_rank)))
 
             # Give an opportunity to claim
-            available_claims = self._player_available_claims(curr_player, trump_claim)
+            available_claims = get_available_claims(curr_player, self.trump_rank, trump_claim)
             if len(available_claims) > 0:
                 claim = available_claims[0]
 
@@ -340,6 +281,7 @@ class TractorRound(object):
             player.points = 0
 
     def play(self, first_game=False):
+        # Prepare
         self.deck.prepare()
         self._zero_out_player_points()
 

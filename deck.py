@@ -1,5 +1,7 @@
 from enum import unique, Enum
 
+BIG_JOKER = "Big Joker"
+SMALL_JOKER = "Small Joker"
 TRUMP_SUIT = "trump_suit"
 
 @unique
@@ -37,9 +39,9 @@ class Card(object):
         ## Two values are left for trump rank here
 
         if self.value == 17:
-            return "Small Joker"
+            return SMALL_JOKER
         if self.value == 18:
-            return "Big Joker"
+            return BIG_JOKER
 
     def __gt__(self, card2):
         return self.value > card2.value

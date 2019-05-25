@@ -1,7 +1,6 @@
+from constants import WINNING_RANK
 from player import Player
 from tractor_round import TractorRound
-
-WINNING_RANK = 14
 
 class Game(object):
     def __init__(self, num_players, num_decks, active_player):
