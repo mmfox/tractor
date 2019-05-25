@@ -1,7 +1,7 @@
 from player import Player
 from tractor_round import TractorRound
 
-WINNING_RANK = 3
+WINNING_RANK = 14
 
 class Game(object):
     def __init__(self, num_players, num_decks, active_player):
@@ -11,25 +11,20 @@ class Game(object):
 
     def play(self):
         first_game = True
-        winner = False
+        winner = None
         lead_player = self.active_player
         while not winner:
             tractor_round = TractorRound(num_players=self.num_players, num_decks=self.num_decks, active_player=self.active_player, lead_player=lead_player)
             lead_player = tractor_round.play(first_game=first_game)
             first_game=False 
             
-            if self.active_player.rank >= WINNING_RANK:
-                winner = self.active_player
-            curr_player = self.active_player.next_player
-
-            while curr_player != self.active_player:
-                if curr_player.rank >= WINNING_RANK and (not winner or curr_player.rank > winner.rank):
-                    winner = curr_player
-                curr_player = curr_player.next_player
+            player_iterator = iter(self.active_player)
+            for player in player_iterator:
+                if player.rank >= WINNING_RANK and (not winner or player.rank > winner.rank):
+                    winner = player
 
         print("\n\nGame complete!  " + str(winner) + " has won!\n")
         
-
 
 if __name__ == "__main__":
     matt = Player("Matt") 

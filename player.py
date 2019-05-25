@@ -23,11 +23,11 @@ class Player(object):
 
     def __next__(self):
         if not self.curr_iter_player:
-            self.curr_iter_player = self.next_player
+            self.curr_iter_player = self
             return self.curr_iter_player
 
         self.curr_iter_player = self.curr_iter_player.next_player
-        if self.curr_iter_player == self.next_player:
+        if self.curr_iter_player == self:
             raise StopIteration
         return self.curr_iter_player
 

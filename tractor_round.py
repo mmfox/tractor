@@ -317,11 +317,10 @@ class TractorRound(object):
 
     def play_trick(self):
         plays = []
-        plays.append(self.make_play(self.lead_player))
-        curr_player = self.lead_player.next_player
-        while curr_player != self.lead_player:
-            plays.append(self.make_play(curr_player, plays[0]))
-            curr_player = curr_player.next_player
+        player_iterator = iter(self.lead_player)
+        for player in player_iterator:
+            lead_play = plays[0] if plays else None
+            plays.append(self.make_play(player, lead_play))
 
         winning_play = self.play_comparitor.compare_plays(plays)
         print(str(winning_play.player) + " won the round!\n")
@@ -336,11 +335,9 @@ class TractorRound(object):
         self.lead_player.points += points
             
     def _zero_out_player_points(self):
-        self.lead_player.points = 0
-        curr_player = self.lead_player.next_player
-        while curr_player != self.lead_player:
-            curr_player.points = 0
-            curr_player = curr_player.next_player
+        player_iterator = iter(self.lead_player)
+        for player in player_iterator:
+            player.points = 0
 
     def play(self, first_game=False):
         self.deck.prepare()
@@ -378,21 +375,14 @@ class TractorRound(object):
         defending_points = 0
 
         defender_set = set()
-
-        if self.lead_player in self.attacker_set:
-            attacking_points += self.lead_player.points
-        else:
-            defender_set.add(self.lead_player)
-            defending_points += self.lead_player.points
-
-        while curr_player != self.lead_player:
-            print(str(curr_player) + " earned " + str(curr_player.points) + " points.\n")
-            if curr_player in self.attacker_set:
-                attacking_points += curr_player.points
+        player_iterator = iter(self.lead_player)
+        for player in player_iterator:
+            print(str(player) + " earned " + str(player.points) + " points.\n")
+            if player in self.attacker_set:
+                attacking_points += player.points
             else:
-                defender_set.add(curr_player)
-                defending_points += curr_player.points
-            curr_player = curr_player.next_player
+                defender_set.add(player)
+                defending_points += player.points
 
         print("Final attacking team was: " + str(self.attacker_set))
         print("Final defending team was: " + str(defender_set))
@@ -413,14 +403,3 @@ class TractorRound(object):
             next_round_leader = next_round_leader.next_player
        
         return next_round_leader 
- 
-
-if __name__ == "__main__":
-    matt = Player("Matt") 
-    roger = Player("Roger", matt)
-    carlo = Player("Carlo", roger)
-    aviv = Player("Aviv", carlo)
-    matt.next_player = aviv 
-    tractor_round = TractorRound(num_players=4, num_decks=2, active_player=matt, lead_player=matt)
-
-    tractor_round.play(first_game=True)
