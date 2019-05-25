@@ -3,10 +3,11 @@ import random
 
 from deck import Suit
 from find_friend import FriendRequirement
-from play_comparitor import (Play, PlayType, PlayComparitor)
+from play_comparitor import Play, PlayType, PlayComparitor
 from player import Player
+from rank import get_rank_up
 from tractor_deck import TractorDeck
-from trump_claim import (TrumpClaim, TrumpClaimType)
+from trump_claim import TrumpClaim, TrumpClaimType
 
 KITTY_MIN = 5
 CARDS_PER_DECK = 54
@@ -23,6 +24,7 @@ class TractorRound(object):
         self.active_player = active_player
 
         self.lead_player = lead_player
+        self.declarer = lead_player
         self.num_players = num_players
         self.num_decks = num_decks
         self.trump_rank = lead_player.rank
@@ -144,6 +146,7 @@ class TractorRound(object):
             curr_player = curr_player.next_player
 
         self.lead_player = first_player
+        self.declarer = first_player
         print("First to act: " + str(self.lead_player))
         print("Final trump suit is: " + str(self.trump_suit))
 
@@ -332,9 +335,16 @@ class TractorRound(object):
         self.lead_player = winning_play.player
         self.lead_player.points += points
             
+    def _zero_out_player_points(self):
+        self.lead_player.points = 0
+        curr_player = self.lead_player.next_player
+        while curr_player != self.lead_player:
+            curr_player.points = 0
+            curr_player = curr_player.next_player
 
     def play(self, first_game=False):
         self.deck.prepare()
+        self._zero_out_player_points()
 
         # Draw cards
         self.draw(first_game)
@@ -350,7 +360,6 @@ class TractorRound(object):
             self.play_trick()
        
         # Figure out kitty points
-        # TODO - double points if not on same team as declarer
         kitty_points = 0
         for card in self.deck.kitty:
             kitty_points += card.points
@@ -368,9 +377,12 @@ class TractorRound(object):
         attacking_points = 0
         defending_points = 0
 
+        defender_set = set()
+
         if self.lead_player in self.attacker_set:
             attacking_points += self.lead_player.points
         else:
+            defender_set.add(self.lead_player)
             defending_points += self.lead_player.points
 
         while curr_player != self.lead_player:
@@ -378,14 +390,29 @@ class TractorRound(object):
             if curr_player in self.attacker_set:
                 attacking_points += curr_player.points
             else:
+                defender_set.add(curr_player)
                 defending_points += curr_player.points
             curr_player = curr_player.next_player
 
         print("Final attacking team was: " + str(self.attacker_set))
+        print("Final defending team was: " + str(defender_set))
         print("Attacking team earned " + str(attacking_points) + " points!")
         print("Defending team earned " + str(defending_points) + " points!")
 
-        
+        attacking_rank_up, defending_rank_up = get_rank_up(defending_points)
+        for player in self.attacker_set:
+            player.rank += attacking_rank_up
+            print(str(player) + " now has a rank of " + str(player.rank))
+        for player in defender_set:
+            player.rank += defending_rank_up
+            print(str(player) + " now has a rank of " + str(player.rank))
+
+        next_round_leader_set = self.attacker_set if attacking_rank_up > 0 else defender_set
+        next_round_leader = self.declarer.next_player 
+        while next_round_leader not in next_round_leader_set:
+            next_round_leader = next_round_leader.next_player
+       
+        return next_round_leader 
  
 
 if __name__ == "__main__":
