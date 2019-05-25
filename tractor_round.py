@@ -93,7 +93,7 @@ class TractorRound(object):
 
         self.play_comparitor = PlayComparitor(self.trump_suit, self.trump_rank)
 
-    def handle_kitty(self):
+    def set_aside_kitty(self):
         self.lead_player.hand += self.deck.kitty
 
         kitty_cards = []
@@ -130,100 +130,109 @@ class TractorRound(object):
             return card.comparison_value(self.trump_rank, self.trump_suit)
         return sorted(cards, key = func, reverse=True)
 
+    def get_active_player_play(self, led_play):
+        valid_play = False
+        while not valid_play:
+            if led_play:
+                print("\n\nThe lead for this trick was " + str(led_play) + ".  Please follow this lead.")
+ 
+            played_cards_str = raw_input("\n\nPick what to play from your hand (e.g. 2 of clubs, 2 of clubs): \n" + str(self.active_player.pretty_hand_repr(self.trump_rank)) + "\n")
+            print("\n")
+
+            parsed_played_cards_str = played_cards_str.split(", ") 
+            played_cards = []
+            indices_to_remove = []
+
+            for played_card_str in parsed_played_cards_str:
+                for index, card in enumerate(self.active_player.hand):
+                    if played_card_str == str(card) and index not in indices_to_remove:
+                        played_cards.append(card)
+                        indices_to_remove.append(index)
+                        break 
+
+            # Verify we parsed everything correctly
+            if len(parsed_played_cards_str) != len(played_cards):
+                print("The play was incorrectly formatted.  Please copy the exact strings printed above to play.")
+                continue
+
+            # Verify is valid play
+            # TODO - add verification that the player didn't have to play something else
+            played_cards = self._sort_cards(played_cards)
+            if not self.play_comparitor.is_valid_lead(played_cards) or (led_play != None and len(led_play.cards) != len(played_cards)):
+                print("The provided play is not valid.  Please play a single card, a pair, top card, or a tractor.  Follow the led play if you are not leading.")
+                continue
+            valid_play = True
+
+            # Remove cards from hand
+            indices_to_remove.sort(reverse=True)
+            for index in indices_to_remove:
+                self.active_player.hand.pop(index)
+
+        return played_cards
+
+    def get_bot_play(self, player, led_play):
+        if led_play:
+            led_type = self.play_comparitor.get_play_type(led_play.cards)
+            led_trump_or_suit = led_play.cards[0].trump_or_suit(self.trump_rank, self.trump_suit)
+            allowed_cards = [card for card in player.hand if card.trump_or_suit(self.trump_rank, self.trump_suit) == led_trump_or_suit]
+            if len(allowed_cards) < len(led_play.cards):
+                player_hand_unallowed_cards = [card for card in player.hand if card not in allowed_cards]
+                allowed_cards += player_hand_unallowed_cards[0:len(led_play.cards)-len(allowed_cards)]
+
+            played_cards = allowed_cards[0:len(led_play.cards)]
+
+            if led_type == PlayType.SINGLE:
+                played_cards = [allowed_cards[0]]
+            elif led_type == PlayType.TRACTOR:
+                following_tractors = self.play_comparitor.find_tractors(allowed_cards, led_trump_or_suit, len(led_play.cards))
+
+                if len(following_tractors) > 0:
+                    played_cards = following_tractors[0]
+                else:
+                    played_cards = []
+                    following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
+                    while len(played_cards) < len(led_play.cards) and len(following_pairs) > len(played_cards) / 2:
+                        played_cards += following_pairs[len(played_cards) / 2]
+
+                    if len(played_cards) < len(led_play.cards):
+                       allowed_unplayed_cards = [card for card in allowed_cards if card not in played_cards]
+                       played_cards += allowed_unplayed_cards[0:len(led_play.cards)-len(played_cards)]                            
+
+            elif led_type == PlayType.PAIR:
+                following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
+                if len(following_pairs) > 0:
+                    played_cards = following_pairs[0]
+            # TODO - implement top card
+            elif led_type == PlayType.TOP_CARD:
+                pass
+ 
+            played_cards = self._sort_cards(played_cards)
+
+            indices_to_remove = []
+            for played_card in played_cards:
+                for index, card in enumerate(player.hand):
+                    if played_card == card and index not in indices_to_remove:
+                        indices_to_remove.append(index)
+                        break
+               
+            indices_to_remove.sort(reverse=True)
+            for index in indices_to_remove:
+                player.hand.pop(index)
+        else:
+            played_cards = [player.hand[0]]
+            player.hand.pop(0)
+
+        return played_cards
+
     def make_play(self, player, led_play=None):
         if player == self.active_player:
-            valid_play = False
-            while not valid_play:
-                if led_play:
-                    print("\n\nThe lead for this trick was " + str(led_play) + ".  Please follow this lead.")
- 
-                played_cards_str = raw_input("\n\nPick what to play from your hand (e.g. 2 of clubs, 2 of clubs): \n" + str(player.pretty_hand_repr(self.trump_rank)) + "\n")
-                print("\n")
-
-                parsed_played_cards_str = played_cards_str.split(", ") 
-                played_cards = []
-                indices_to_remove = []
-
-                for played_card_str in parsed_played_cards_str:
-                    for index, card in enumerate(player.hand):
-                        if played_card_str == str(card) and index not in indices_to_remove:
-                            played_cards.append(card)
-                            indices_to_remove.append(index)
-                            break 
-
-                # Verify we parsed everything correctly
-                if len(parsed_played_cards_str) != len(played_cards):
-                    print("The play was incorrectly formatted.  Please copy the exact strings printed above to play.")
-                    continue
-
-                # Verify is valid play
-                # TODO - add verification that the player didn't have to play something else
-                played_cards = self._sort_cards(played_cards)
-                if not self.play_comparitor.is_valid_lead(played_cards) or (led_play != None and len(led_play.cards) != len(played_cards)):
-                    print("The provided play is not valid.  Please play a single card, a pair, top card, or a tractor.  Follow the led play if you are not leading.")
-                    continue
-                valid_play = True
-
-                # Remove cards from hand
-                indices_to_remove.sort(reverse=True)
-                for index in indices_to_remove:
-                    player.hand.pop(index)
+            played_cards = self.get_active_player_play(led_play)
         else:
-            if led_play:
-                led_type = self.play_comparitor.get_play_type(led_play.cards)
-                led_trump_or_suit = led_play.cards[0].trump_or_suit(self.trump_rank, self.trump_suit)
-                allowed_cards = [card for card in player.hand if card.trump_or_suit(self.trump_rank, self.trump_suit) == led_trump_or_suit]
-                if len(allowed_cards) < len(led_play.cards):
-                    player_hand_unallowed_cards = [card for card in player.hand if card not in allowed_cards]
-                    allowed_cards += player_hand_unallowed_cards[0:len(led_play.cards)-len(allowed_cards)]
-
-                played_cards = allowed_cards[0:len(led_play.cards)]
-
-                if led_type == PlayType.SINGLE:
-                    played_cards = [allowed_cards[0]]
-                elif led_type == PlayType.TRACTOR:
-                    following_tractors = self.play_comparitor.find_tractors(allowed_cards, led_trump_or_suit, len(led_play.cards))
-
-                    if len(following_tractors) > 0:
-                        played_cards = following_tractors[0]
-                    else:
-                        played_cards = []
-                        following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
-                        while len(played_cards) < len(led_play.cards) and len(following_pairs) > len(played_cards) / 2:
-                            played_cards += following_pairs[len(played_cards) / 2]
-
-                        if len(played_cards) < len(led_play.cards):
-                           allowed_unplayed_cards = [card for card in allowed_cards if card not in played_cards]
-                           played_cards += allowed_unplayed_cards[0:len(led_play.cards)-len(played_cards)]                            
-
-                elif led_type == PlayType.PAIR:
-                    following_pairs = self.play_comparitor.find_pairs(allowed_cards, led_trump_or_suit)
-                    if len(following_pairs) > 0:
-                        played_cards = following_pairs[0]
-                # TODO - implement top card
-                elif led_type == PlayType.TOP_CARD:
-                    pass
- 
-                played_cards = self._sort_cards(played_cards)
-
-                indices_to_remove = []
-                for played_card in played_cards:
-                    for index, card in enumerate(player.hand):
-                        if played_card == card and index not in indices_to_remove:
-                            indices_to_remove.append(index)
-                            break
-                   
-                indices_to_remove.sort(reverse=True)
-                for index in indices_to_remove:
-                    player.hand.pop(index)
-            else:
-                played_cards = [player.hand[0]]
-                player.hand.pop(0)
-
+            played_cards = self.get_bot_play(player, led_play)
 
         print(str(player) + " is playing " + str(played_cards))
 
-        # Check if they join the defending team
+        # Check if they join the attacking team
         for friend_req in self.friend_reqs:
             if friend_req.is_friend(played_cards):
                 self.attacker_set.add(player)
@@ -280,6 +289,74 @@ class TractorRound(object):
         for player in player_iterator:
             player.points = 0
 
+    def handle_kitty(self): 
+        kitty_points = 0
+        for card in self.deck.kitty:
+            kitty_points += card.points
+
+        if self.lead_player not in self.attacker_set:
+            kitty_points *= 2
+            print("Defending team won the kitty!  Double trouble!")
+
+        self.lead_player.points += kitty_points
+
+        # Print results of the round
+        print(str(self.lead_player) + " won the kitty, earning an extra " + str(kitty_points) + " points.\n")
+
+    def calculate_team_points(self):
+        attacking_points = 0
+        defending_points = 0
+        self.defender_set = set()
+
+        player_iterator = iter(self.lead_player)
+        for player in player_iterator:
+            print(str(player) + " earned " + str(player.points) + " points.\n")
+            if player in self.attacker_set:
+                attacking_points += player.points
+            else:
+                self.defender_set.add(player)
+                defending_points += player.points
+
+        print("Final attacking team was: " + str(self.attacker_set))
+        print("Final defending team was: " + str(self.defender_set))
+        print("Attacking team earned " + str(attacking_points) + " points!")
+        print("Defending team earned " + str(defending_points) + " points!")
+
+        return defending_points
+
+    def rank_up_players(self, defending_points):
+        attacking_rank_up, defending_rank_up = get_rank_up(defending_points)
+        for player in self.attacker_set:
+            player.rank += attacking_rank_up
+            print(str(player) + " now has a rank of " + str(player.rank))
+        for player in self.defender_set:
+            player.rank += defending_rank_up
+            print(str(player) + " now has a rank of " + str(player.rank))
+
+        print("\n\n\n\n")
+        return attacking_rank_up
+
+    def determine_next_lead_player(self, attacking_rank_up):
+        next_round_leader_set = self.attacker_set if attacking_rank_up > 0 else self.defender_set
+        next_round_leader = self.declarer.next_player 
+        while next_round_leader not in next_round_leader_set:
+            next_round_leader = next_round_leader.next_player
+       
+        return next_round_leader 
+
+    def determine_results(self):
+        # Handle kitty
+        self.handle_kitty()
+
+        # Calculate team points
+        defending_points = self.calculate_team_points()
+
+        # Rank up
+        attacking_rank_up = self.rank_up_players(defending_points)
+
+        # Determine next lead player
+        return self.determine_next_lead_player(attacking_rank_up)
+
     def play(self, first_game=False):
         # Prepare
         self.deck.prepare()
@@ -288,8 +365,8 @@ class TractorRound(object):
         # Draw cards
         self.draw(first_game)
 
-        # Handle Kitty
-        self.handle_kitty()
+        # Set aside kitty
+        self.set_aside_kitty()
 
         # Set find freinds requirements
         self.set_friend_reqs()
@@ -297,51 +374,6 @@ class TractorRound(object):
         # Let's play tractor
         while len(self.lead_player.hand) > 0:
             self.play_trick()
-       
-        # Figure out kitty points
-        kitty_points = 0
-        for card in self.deck.kitty:
-            kitty_points += card.points
-
-        if self.lead_player not in self.attacker_set:
-            kitty_points *= 2
-            print("Attacking team won the kitty!  Double trouble!")
-
-        self.lead_player.points += kitty_points
-
-        # Print results of the round
-        print(str(self.lead_player) + " won the kitty, earning an extra " + str(kitty_points) + " for a total of " + str(self.lead_player.points) + " points.\n")
-        curr_player = self.lead_player.next_player
-
-        attacking_points = 0
-        defending_points = 0
-
-        defender_set = set()
-        player_iterator = iter(self.lead_player)
-        for player in player_iterator:
-            print(str(player) + " earned " + str(player.points) + " points.\n")
-            if player in self.attacker_set:
-                attacking_points += player.points
-            else:
-                defender_set.add(player)
-                defending_points += player.points
-
-        print("Final attacking team was: " + str(self.attacker_set))
-        print("Final defending team was: " + str(defender_set))
-        print("Attacking team earned " + str(attacking_points) + " points!")
-        print("Defending team earned " + str(defending_points) + " points!")
-
-        attacking_rank_up, defending_rank_up = get_rank_up(defending_points)
-        for player in self.attacker_set:
-            player.rank += attacking_rank_up
-            print(str(player) + " now has a rank of " + str(player.rank))
-        for player in defender_set:
-            player.rank += defending_rank_up
-            print(str(player) + " now has a rank of " + str(player.rank))
-
-        next_round_leader_set = self.attacker_set if attacking_rank_up > 0 else defender_set
-        next_round_leader = self.declarer.next_player 
-        while next_round_leader not in next_round_leader_set:
-            next_round_leader = next_round_leader.next_player
-       
-        return next_round_leader 
+      
+        # Determine results
+        return self.determine_results()
