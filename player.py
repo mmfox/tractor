@@ -17,6 +17,23 @@ class Player(object):
     def __eq__(self, player2):
         return self.name == player2.name
 
+    def __iter__(self):
+        self.curr_iter_player = None
+        return self
+
+    def __next__(self):
+        if not self.curr_iter_player:
+            self.curr_iter_player = self.next_player
+            return self.curr_iter_player
+
+        self.curr_iter_player = self.curr_iter_player.next_player
+        if self.curr_iter_player == self.next_player:
+            raise StopIteration
+        return self.curr_iter_player
+
+    def next(self):
+        return self.__next__()
+
     def rank_up(self, rank_increase):
         self.rank += rank_increase
 
